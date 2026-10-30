@@ -195,7 +195,10 @@ hr{border:0;border-top:1px solid var(--line);margin:16px 0}
   .s-half img{max-width:130mm;max-height:115mm}
   .s-full{break-after:page;page-break-after:always}
   .s-full:last-child{break-after:auto;page-break-after:auto}
-  .s-full img{max-width:186mm;max-height:235mm}
+  .s-full img{max-width:186mm;max-height:255mm}
+  .s-full.has-sig img{max-height:198mm}
+  .s-half.has-sig img{max-height:100mm}
+  .pdoc .sig{break-before:avoid;page-break-before:avoid}
   .sig{display:inline-block;text-align:center;font-size:14pt;line-height:1.75;margin-top:1mm;color:#000}
   .sig .h{font-weight:700;font-size:16pt}
   .sig .pline{font-weight:700;font-size:15pt;border:.4mm solid #000;padding:1mm 4mm;margin-bottom:2mm;display:inline-block}
@@ -603,8 +606,9 @@ async function doPrint(){
       const d=DOCS.find(x=>x.id===id);if(!d)continue;
       const size=opt.size==='auto'?cat(d.cat).size:opt.size;
       const imgs=[];for(const s of d.images)imgs.push(await renderCopy(s,opt));
-      if(size==='full')imgs.forEach(s=>html+=`<section class="pdoc s-full"><img src="${s}">${sig}</section>`);
-      else html+=`<section class="pdoc s-${size}">${imgs.map(s=>`<img src="${s}">`).join('')}${sig}</section>`;
+      const hs=sig?' has-sig':'';
+      if(size==='full')imgs.forEach(s=>html+=`<section class="pdoc s-full${hs}"><img src="${s}">${sig}</section>`);
+      else html+=`<section class="pdoc s-${size}${hs}">${imgs.map(s=>`<img src="${s}">`).join('')}${sig}</section>`;
     }
     $('#printArea').innerHTML=html;
     await Promise.all([...$('#printArea').querySelectorAll('img')].map(i=>i.decode().catch(()=>{})));
