@@ -255,7 +255,7 @@ hr{border:0;border-top:1px solid var(--line);margin:16px 0}
 <div id="busy" class="hidden">กำลังประมวลผล…</div>
 
 <input type="file" id="fCam" accept="image/*" capture="environment" class="hidden">
-<input type="file" id="fGal" accept="image/*" multiple class="hidden">
+<input type="file" id="fGal" accept="image/*,application/pdf,.pdf" multiple class="hidden">
 <input type="file" id="fImport" accept="application/json,.json" class="hidden">
 
 <script>
@@ -442,14 +442,14 @@ function editDoc(id,c){
    <label class="f">ชื่อเอกสาร</label>
    <input class="inp" id="eTitle" value="${esc(ED.title)}" placeholder="เช่น บัตรประชาชน (ตัวเอง)">
    <label class="f">รูปเอกสาร (เรียงตามลำดับหน้า เช่น หน้า-หลัง)</label>
-   <div class="row"><button class="btn ghost" onclick="$('#fCam').click()">📷 ถ่ายรูป</button><button class="btn ghost" onclick="$('#fGal').click()">🖼️ เลือกจากเครื่อง</button></div>
+   <div class="row"><button class="btn ghost" onclick="$('#fCam').click()">📷 ถ่ายรูป</button><button class="btn ghost" onclick="$('#fGal').click()">🖼️ เลือกรูป / PDF</button></div>
    <div class="imgs" id="eImgs"></div>
    <label class="f">เลขที่เอกสาร (ถ้ามี) — เช่น เลขบัตรประชาชน 13 หลัก</label>
    <input class="inp" id="eNo" inputmode="numeric" value="${esc(ED.docNo||'')}" placeholder="แสดงแบบซ่อนบางส่วน กดคัดลอกได้">
    <div class="row"><div><label class="f">วันหมดอายุ (ถ้ามี)</label><input class="inp" type="date" id="eExp" value="${ED.expiry||''}"></div></div>
    <label class="f">หมายเหตุ</label>
    <textarea class="inp" id="eNote" rows="2" placeholder="เช่น เลขที่เอกสาร, ที่เก็บตัวจริง">${esc(ED.note||'')}</textarea>
-   <div class="note">💡 ครอปรูปให้ชิดขอบบัตรก่อน (ใช้ตัวแต่งรูปในมือถือ) เวลาพิมพ์ขนาดเท่าบัตรจริงจะได้พอดี</div>
+   <div class="note">📄 เลือกไฟล์ PDF ได้ — แต่ละหน้าจะถูกแปลงเป็นรูปให้อัตโนมัติ ลบหน้าที่ไม่ต้องการได้ด้วยปุ่ม ✕<br>💡 ครอปรูปให้ชิดขอบบัตรก่อน (ใช้ตัวแต่งรูปในมือถือ) เวลาพิมพ์ขนาดเท่าบัตรจริงจะได้พอดี</div>
    <div class="actions"><button class="btn" onclick="saveEditor()">💾 บันทึก</button></div>`);
   renderEdImgs();
   $('#eCat').onchange=e=>{ED.cat=e.target.value;if(!$('#eTitle').value)$('#eTitle').placeholder=cat(ED.cat).name};
@@ -464,7 +464,26 @@ function rmImg(i){ED.images.splice(i,1);renderEdImgs()}
 async function rotImg(i){const img=await loadImg(ED.images[i]);const c=document.createElement('canvas');c.width=img.height;c.height=img.width;const x=c.getContext('2d');x.translate(c.width/2,c.height/2);x.rotate(Math.PI/2);x.drawImage(img,-img.width/2,-img.height/2);ED.images[i]=c.toDataURL('image/jpeg',.88);renderEdImgs()}
 function loadImg(src){return new Promise((r,j)=>{const i=new Image();i.onload=()=>r(i);i.onerror=j;i.src=src})}
 async function fileToDataURL(f,max=2200){const u=URL.createObjectURL(f);try{const img=await loadImg(u);const s=Math.min(1,max/Math.max(img.width,img.height));const c=document.createElement('canvas');c.width=Math.round(img.width*s);c.height=Math.round(img.height*s);const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(img,0,0,c.width,c.height);return c.toDataURL('image/jpeg',.88)}finally{URL.revokeObjectURL(u)}}
-async function addFiles(files){if(!ED)return;busy(true);try{for(const f of files){if(!f.type.startsWith('image/'))continue;try{ED.images.push(await fileToDataURL(f))}catch{toast('อ่านรูปไม่ได้: '+f.name)}}}finally{busy(false)}renderEdImgs()}
+let _pdfjs=null;
+function loadPdfJs(){if(_pdfjs)return _pdfjs;_pdfjs=new Promise((res,rej)=>{const sc=document.createElement('script');sc.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';sc.onload=()=>{pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';res(pdfjsLib)};sc.onerror=()=>{_pdfjs=null;rej(new Error('โหลดตัวอ่าน PDF ไม่ได้ (ต้องต่ออินเทอร์เน็ต)'))};document.head.appendChild(sc)});return _pdfjs}
+async function pdfToImages(f,max=2200){
+  const lib=await loadPdfJs();const pdf=await lib.getDocument({data:await f.arrayBuffer()}).promise;const out=[];
+  for(let i=1;i<=pdf.numPages;i++){
+    $('#busy').textContent=`กำลังแปลง PDF หน้า ${i}/${pdf.numPages}…`;
+    const pg=await pdf.getPage(i);const v1=pg.getViewport({scale:1});const sc=Math.min(4,max/Math.max(v1.width,v1.height));const vp=pg.getViewport({scale:sc});
+    const c=document.createElement('canvas');c.width=Math.round(vp.width);c.height=Math.round(vp.height);const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);
+    await pg.render({canvasContext:x,viewport:vp}).promise;out.push(c.toDataURL('image/jpeg',.88));pg.cleanup();
+  }
+  pdf.destroy();return out;
+}
+const isPdf=f=>f.type==='application/pdf'||/\.pdf$/i.test(f.name);
+async function addFiles(files){if(!ED)return;busy(true);let n=0;
+  try{for(const f of files){
+    if(isPdf(f)){try{const imgs=await pdfToImages(f);ED.images.push(...imgs);n+=imgs.length;if(!$('#eTitle').value)$('#eTitle').value=f.name.replace(/\.pdf$/i,'')}catch(e){alert('เปิด PDF ไม่ได้: '+f.name+'\n'+(e.message||e))}continue}
+    if(!f.type.startsWith('image/'))continue;
+    try{ED.images.push(await fileToDataURL(f));n++}catch{toast('อ่านรูปไม่ได้: '+f.name)}}}
+  finally{busy(false);$('#busy').textContent='กำลังประมวลผล…'}
+  renderEdImgs();if(n)toast(`เพิ่มแล้ว ${n} หน้า`)}
 $('#fCam').onchange=e=>{addFiles([...e.target.files]);e.target.value=''};
 $('#fGal').onchange=e=>{addFiles([...e.target.files]);e.target.value=''};
 async function saveEditor(){
