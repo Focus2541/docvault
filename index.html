@@ -392,10 +392,10 @@ function renderHome(){
   $('#hsub').textContent=DOCS.length?`เอกสารในกระเป๋า ${DOCS.length} รายการ`:'ยังไม่มีเอกสารในกระเป๋า';
   const ds=sortedDocs();
   $('#wallet').innerHTML=ds.map(d=>`<button class="wcard" data-id="${d.id}" style="background-image:url('${d.images[0]}')"><div class="ov"></div><span class="tg">${cat(d.cat).icon} ${cat(d.cat).name}</span><div class="lb"><b>${esc(d.title)}</b><small>${d.docNo?esc(maskNo(d.docNo)):(d.images.length+' หน้า')}</small></div></button>`).join('')
-    +`<button class="wcard empty" id="wAdd"><i>＋</i>เพิ่มเอกสาร</button>`;
+    +`<button class="wcard empty" id="wAdd"><i>＋</i>เพิ่มเอกสาร</button>`+(DOCS.length?'':`<button class="wcard empty" id="wImp"><i>📦</i>นำเข้าชุดเอกสาร (.json)</button>`);
   $('#wallet').querySelectorAll('.wcard[data-id]').forEach(b=>b.onclick=()=>openViewer(b.dataset.id));
-  $('#wAdd').onclick=()=>editDoc(null);
-  const n=ds.length+1;$('#wdots').innerHTML=n>1?Array.from({length:n},(_,i)=>`<i class="${i?'':'on'}"></i>`).join(''):'';
+  $('#wAdd').onclick=()=>editDoc(null);if($('#wImp'))$('#wImp').onclick=()=>$('#fImport').click();
+  const n=ds.length+(DOCS.length?1:2);$('#wdots').innerHTML=n>1?Array.from({length:n},(_,i)=>`<i class="${i?'':'on'}"></i>`).join(''):'';
   const now=new Date();
   const al=DOCS.filter(d=>d.expiry&&(new Date(d.expiry)-now)/864e5<=60).sort((a,b)=>a.expiry.localeCompare(b.expiry));
   $('#alerts').innerHTML=al.map(d=>{const days=Math.ceil((new Date(d.expiry)-now)/864e5);return`<button class="alert ${days<0?'exp':''}" data-id="${d.id}">${days<0?'⛔':'⚠️'} <span><b>${esc(d.title)}</b> ${days<0?'หมดอายุแล้ว':`จะหมดอายุในอีก ${days} วัน`} (${thDate(d.expiry)})</span></button>`}).join('');
@@ -628,7 +628,7 @@ $('#setBtn').onclick=()=>{
    <hr>
    <b>สำรองข้อมูล</b>
    <div class="meta" style="margin-top:4px">เอกสาร ${DOCS.length} รายการ • ประมาณ ${(total/1048576).toFixed(1)} MB<br>ไฟล์สำรองยังเข้ารหัสอยู่ ต้องใช้ PIN ปัจจุบันเปิด — ใช้ย้ายไปเครื่องใหม่หรือกันข้อมูลหาย (เช่น ล้างข้อมูลเบราว์เซอร์)</div>
-   <div class="row"><button class="btn ghost sm" onclick="exportBackup()">⬇️ ส่งออกไฟล์สำรอง</button><button class="btn ghost sm" onclick="$('#fImport').click()">⬆️ นำเข้าไฟล์สำรอง</button></div>
+   <div class="row"><button class="btn ghost sm" onclick="exportBackup()">⬇️ ส่งออกไฟล์สำรอง</button><button class="btn ghost sm" onclick="$('#fImport').click()">⬆️ นำเข้าไฟล์สำรอง / ชุดเอกสาร</button></div>
    <hr>
    <div class="note">🔐 เอกสารเข้ารหัส AES-256 ด้วย PIN และเก็บในเบราว์เซอร์เครื่องนี้เท่านั้น ไม่มีการส่งขึ้นอินเทอร์เน็ต • ล็อกอัตโนมัติเมื่อออกจากแอปเกิน 3 นาที</div>
    <div class="actions"><button class="btn red sm" onclick="wipeAll()">ลบข้อมูลทั้งหมดและเริ่มใหม่</button></div>`);
@@ -658,7 +658,14 @@ async function exportBackup(){
 }
 $('#fImport').onchange=async e=>{
   const f=e.target.files[0];e.target.value='';if(!f)return;
-  let j;try{j=JSON.parse(await f.text());if(j.app!=='doc-vault')throw 0}catch{alert('ไฟล์ไม่ถูกต้อง');return}
+  let j;try{j=JSON.parse(await f.text());if(j.app!=='doc-vault'&&j.app!=='doc-vault-pack')throw 0}catch{alert('ไฟล์ไม่ถูกต้อง');return}
+  if(j.app==='doc-vault-pack'){
+    if(!confirm(`เพิ่ม ${j.docs.length} เอกสารจากชุดเอกสารนี้?\n(เอกสารเดิมในแอปยังอยู่ครบ)`))return;
+    busy(true);let n=0;
+    try{for(const d of j.docs){if(!d.images?.length)continue;await saveDoc({id:uid(),cat:CATS.some(c=>c.id===d.cat)?d.cat:'other',title:d.title||'เอกสาร',docNo:d.docNo||'',expiry:d.expiry||'',note:d.note||'',images:d.images,updated:Date.now()+n});n++}}
+    catch(e){alert('นำเข้าไม่สำเร็จ: '+e.message)}finally{busy(false)}
+    closeModal();renderAll();showTab('home');toast(`เพิ่มแล้ว ${n} เอกสาร — ลบไฟล์ชุดเอกสารในเครื่องทิ้งได้เลย`);return;
+  }
   if(!confirm(`นำเข้า ${j.docs.length} เอกสาร?\nข้อมูลปัจจุบันในเครื่องนี้จะถูกแทนที่ทั้งหมด และต้องใช้ PIN ของไฟล์สำรองในการเปิด`))return;
   const dbh=await db();
   await new Promise((res,rej)=>{const t=dbh.transaction(['meta','docs'],'readwrite');const m=t.objectStore('meta'),s=t.objectStore('docs');m.clear();s.clear();m.put(unb64(j.salt),'salt');m.put(unpackE(j.verifier),'verifier');if(j.settings)m.put(unpackE(j.settings),'settings');j.docs.forEach(d=>s.put({id:d.id,...unpackE(d)}));t.oncomplete=res;t.onerror=()=>rej(t.error)});
