@@ -218,7 +218,7 @@ hr{border:0;border-top:1px solid var(--line);margin:16px 0}
   <img class="sp-logo" src="icon.svg" alt="">
   <h1 class="sp-name">แฟ้มเอกสารของฉัน</h1>
   <p class="sp-tag">เก็บเอกสารสำคัญ ปลอดภัย พกพาง่าย</p>
-  <div class="sp-feat"><span>🔐 เข้ารหัส</span><span>🖨️ พิมพ์สำเนา</span><span>📱 ใช้ได้ไม่มีเน็ต</span></div>
+  <div class="sp-feat"><span>🔐 เข้ารหัส</span><span>🖨️ พิมพ์ / แชร์สำเนา</span><span>📱 ใช้ได้ไม่มีเน็ต</span></div>
   <div class="sp-load"><i></i></div>
   <div class="sp-foot">ข้อมูลเก็บในเครื่องนี้เท่านั้น</div>
 </div>
@@ -417,7 +417,7 @@ document.querySelectorAll('.bnav [data-t]').forEach(b=>b.onclick=()=>{if(b.datas
 $('#qAll').onclick=()=>{filter='all';renderChips();renderList();showTab('docs')};
 $('#qAdd').onclick=()=>editDoc(null);
 $('#qPrint').onclick=()=>openPrint([]);
-$('#qShare').onclick=()=>{if(!DOCS.length){toast('ยังไม่มีเอกสาร');return}openModal(head('📤 เลือกเอกสารที่จะส่ง')+`<div class="pdl">${sortedDocs().map(d=>`<label onclick="closeModal();shareCopy('${d.id}')">${cat(d.cat).icon} ${esc(d.title)}</label>`).join('')}</div>`)};
+$('#qShare').onclick=()=>openPrint([]);
 let VID=null;
 function openViewer(id){const d=DOCS.find(x=>x.id===id);if(!d)return;VID=id;
   $('#vTitle').textContent=d.title;
@@ -429,7 +429,7 @@ function openViewer(id){const d=DOCS.find(x=>x.id===id);if(!d)return;VID=id;
 function closeViewer(){$('#viewer').classList.add('hidden');VID=null}
 function toggleNo(sel,id){const d=DOCS.find(x=>x.id===id),el=$(sel);el.dataset.full=el.dataset.full==='1'?'0':'1';el.textContent=el.dataset.full==='1'?fmtNo(d.docNo):maskNo(d.docNo)}
 $('#vPrint').onclick=()=>{const id=VID;closeViewer();openPrint([id])};
-$('#vShare').onclick=()=>shareCopy(VID);
+$('#vShare').onclick=()=>{const id=VID;closeViewer();openPrint([id])};
 $('#vInfo').onclick=()=>{const id=VID;closeViewer();viewDoc(id)};
 function renderChips(){
   const cnt=id=>DOCS.filter(d=>d.cat===id).length;
@@ -458,7 +458,7 @@ function viewDoc(id){
   openModal(head(esc(d.title))+`<div class="dview"><div class="meta">${meta}</div>${no}<button class="btn full" style="margin-bottom:10px" onclick="closeModal();openViewer('${d.id}')">🪪 แสดงบัตรเต็มจอ</button>${d.images.map(s=>`<img src="${s}">`).join('')}</div>
    <div class="actions">
      <button class="btn" onclick="openPrint(['${d.id}'])">🖨️ พิมพ์สำเนา</button>
-     <button class="btn ghost" onclick="shareCopy('${d.id}')">📤 ส่งรูปสำเนา (ลายน้ำ)</button>
+     <button class="btn ghost" onclick="openPrint(['${d.id}'])">📤 แชร์สำเนา</button>
    </div>
    <div class="actions">
      <button class="btn ghost" onclick="editDoc('${d.id}')">✏️ แก้ไข</button>
@@ -567,7 +567,7 @@ async function shareCopy(id){
 function openPrint(pre){
   if(!DOCS.length){toast('ยังไม่มีเอกสาร');return}
   const sel=new Set(pre||[]);
-  openModal(head('🖨️ พิมพ์สำเนา')+`
+  openModal(head('🖨️ พิมพ์ / แชร์สำเนา')+`
    <label class="f">เลือกเอกสาร</label>
    <div class="pdl" id="pDocs">${DOCS.map(d=>`<label><input type="checkbox" value="${d.id}" ${sel.has(d.id)?'checked':''}> ${cat(d.cat).icon} ${esc(d.title)} <small style="color:var(--mut)">(${d.images.length} หน้า)</small></label>`).join('')}</div>
    <label class="f">ขนาดบนกระดาษ A4</label>
@@ -590,36 +590,125 @@ function openPrint(pre){
    <label class="tog"><input type="checkbox" id="pDate" ${SETTINGS.date?'checked':''}> ใส่วันที่ (เว้นว่างไว้เขียนเอง ถ้าไม่ติ๊ก)</label>
    <label class="tog"><input type="checkbox" id="pGray" ${SETTINGS.gray?'checked':''}> พิมพ์ขาว-ดำ (ประหยัดหมึก)</label>
    <div class="note">“อัตโนมัติ” = บัตรประชาชน/ใบขับขี่ขนาดเท่าบัตรจริง, ทะเบียนบ้าน/วุฒิเต็มหน้า, อื่นๆ ครึ่งหน้า<br>ในหน้าต่างพิมพ์ เลือกเครื่องพิมพ์ หรือ “บันทึกเป็น PDF” ได้ — ตั้งสเกล 100% เพื่อให้ขนาดเท่าบัตรจริง</div>
-   <div class="actions"><button class="btn" onclick="doPrint()">🖨️ พิมพ์ / บันทึก PDF</button></div>`);
+   <div class="actions"><button class="btn" onclick="doPrint()">🖨️ พิมพ์</button></div>
+   <div class="actions" style="margin-top:8px"><button class="btn ghost" onclick="doShare('img')">🖼️ แชร์เป็นรูป</button><button class="btn ghost" onclick="doShare('pdf')">📄 แชร์เป็น PDF</button></div>
+   <div class="note" style="margin-top:8px">📤 ไม่มีเครื่องพิมพ์? กดแชร์ แล้วเลือก LINE, Messenger, Facebook, อีเมล หรือบันทึกลงเครื่อง — ได้หน้าตาเหมือนพิมพ์ทุกอย่าง (ลายน้ำ + สำเนาถูกต้อง)</div>`);
   updPrev();
 }
 function updPrev(){const t=purposeText($('#pPur').value);$('#pPrev').textContent=t?'ตัวอย่าง: “'+t+'”':'ไม่ใส่ข้อความ';}
 $('#printBtn').onclick=()=>openPrint(filter!=='all'?DOCS.filter(d=>d.cat===filter).map(d=>d.id):[]);
-async function doPrint(){
+async function buildJob(){
   const ids=[...document.querySelectorAll('#pDocs input:checked')].map(i=>i.value);
-  if(!ids.length){toast('เลือกเอกสารอย่างน้อย 1 รายการ');return}
+  if(!ids.length){toast('เลือกเอกสารอย่างน้อย 1 รายการ');return null}
   const purpose=$('#pPur').value.trim(),ptxt=purposeText(purpose),wmOn=$('#pWmOn').checked,lineOn=$('#pLineOn').checked;
   const opt={size:document.querySelector('input[name=sz]:checked').value,wm:wmOn?ptxt:'',sig:$('#pSig').checked,date:$('#pDate').checked,gray:$('#pGray').checked,name:$('#pName').value.trim()};
   Object.assign(SETTINGS,{purpose,wmOn,lineOn,sig:opt.sig,date:opt.date,gray:opt.gray,signer:opt.name});saveSettings();
-  const line=lineOn&&ptxt?`<div class="pline">${esc(ptxt)}</div>`:'';
-  busy(true);
+  await fontsReady();
+  const job={opt,line:lineOn&&ptxt?ptxt:'',titles:[],sections:[]};
+  job.dateTxt=opt.date?new Date().toLocaleDateString('th-TH',{day:'numeric',month:'long',year:'numeric'}):'.........../.........../...........';
+  job.hasSig=!!(opt.sig||job.line);
+  for(const id of ids){
+    const d=DOCS.find(x=>x.id===id);if(!d)continue;job.titles.push(d.title);
+    const size=opt.size==='auto'?cat(d.cat).size:opt.size;
+    const imgs=[];for(const s of d.images)imgs.push(await renderCopy(s,opt));
+    if(size==='full')imgs.forEach(s=>job.sections.push({size,imgs:[s]}));else job.sections.push({size,imgs});
+  }
+  return job;
+}
+function sigHTML(job){
+  if(!job.hasSig)return'';const o=job.opt;
+  return`<div class="sig">${job.line?`<div class="pline">${esc(job.line)}</div>`:''}${o.sig?`<div class="h">สำเนาถูกต้อง</div>ลงชื่อ ........................................<br>( ${o.name?esc(o.name):'........................................'} )<br>วันที่ ${job.dateTxt}`:''}</div>`;
+}
+async function doPrint(){
+  let job;busy(true);
   try{
-    await fontsReady();
-    const sig=(opt.sig||line)?`<div class="sig">${line}${opt.sig?`<div class="h">สำเนาถูกต้อง</div>ลงชื่อ ........................................<br>( ${opt.name?esc(opt.name):'........................................'} )<br>วันที่ ${opt.date?new Date().toLocaleDateString('th-TH',{day:'numeric',month:'long',year:'numeric'}):'.........../.........../...........'}`:''}</div>`:'';
-    let html='';
-    for(const id of ids){
-      const d=DOCS.find(x=>x.id===id);if(!d)continue;
-      const size=opt.size==='auto'?cat(d.cat).size:opt.size;
-      const imgs=[];for(const s of d.images)imgs.push(await renderCopy(s,opt));
-      const hs=sig?' has-sig':'';
-      if(size==='full')imgs.forEach(s=>html+=`<section class="pdoc s-full${hs}"><img src="${s}">${sig}</section>`);
-      else html+=`<section class="pdoc s-${size}${hs}">${imgs.map(s=>`<img src="${s}">`).join('')}${sig}</section>`;
-    }
-    $('#printArea').innerHTML=html;
+    job=await buildJob();if(!job)return;
+    const sig=sigHTML(job),hs=job.hasSig?' has-sig':'';
+    $('#printArea').innerHTML=job.sections.map(sec=>`<section class="pdoc s-${sec.size}${hs}">${sec.imgs.map(s=>`<img src="${s}">`).join('')}${sig}</section>`).join('');
     await Promise.all([...$('#printArea').querySelectorAll('img')].map(i=>i.decode().catch(()=>{})));
   }finally{busy(false)}
+  if(!job)return;
   closeModal();
   setTimeout(()=>{window.print()},150);
+}
+
+/* ---------- share as images / PDF (same layout as print, A4 @150dpi) ---------- */
+const PX=150/25.4,PW=210,PH=297,MG=12;
+async function renderPages(job){
+  const imgs={};for(const sec of job.sections)for(const s of sec.imgs)if(!imgs[s])imgs[s]=await loadImg(s);
+  const o=job.opt,pt=0.3528,lh=n=>n*pt*1.75;
+  // signature block lines
+  const sl=[];
+  if(job.line)sl.push({t:job.line,pt:15,b:700,box:1});
+  if(o.sig){sl.push({t:'สำเนาถูกต้อง',pt:16,b:700});sl.push({t:'ลงชื่อ ........................................',pt:14});sl.push({t:`( ${o.name||'........................................'} )`,pt:14});sl.push({t:'วันที่ '+job.dateTxt,pt:14});}
+  const sigH=sl.reduce((h,l)=>h+lh(l.pt)+(l.box?3:0),0)+(sl.length?1:0);
+  const box=(sec,im)=>{const iw=im.width,ih=im.height,hs=job.hasSig;let mw,mh;
+    if(sec.size==='card'){const w=85.6;return[w,w*ih/iw]}
+    if(sec.size==='half'){mw=130;mh=hs?100:115}else{mw=186;mh=hs?198:255}
+    const k=Math.min(mw/iw,mh/ih);return[iw*k,ih*k]};
+  // layout
+  const pages=[];let cur=null,y=0;
+  const newPage=()=>{cur=[];pages.push(cur);y=MG};
+  newPage();
+  for(const sec of job.sections){
+    const dims=sec.imgs.map(s=>box(sec,imgs[s]));
+    const H=dims.reduce((h,d)=>h+d[1]+3,0)+sigH;
+    if(y>MG&&y+H>PH-MG)newPage();
+    cur.push({sec,dims,y});y+=H+8;
+    if(sec.size==='full')newPage();
+  }
+  if(!pages[pages.length-1].length)pages.pop();
+  // draw
+  const out=[];
+  for(const pg of pages){
+    const c=document.createElement('canvas');c.width=Math.round(PW*PX);c.height=Math.round(PH*PX);
+    const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);
+    for(const it of pg){
+      let yy=it.y;
+      it.sec.imgs.forEach((s,i)=>{const[w,h]=it.dims[i];const left=(PW-w)/2;
+        x.drawImage(imgs[s],left*PX,yy*PX,w*PX,h*PX);x.strokeStyle='#999';x.lineWidth=.25*PX;x.strokeRect(left*PX,yy*PX,w*PX,h*PX);yy+=h+3});
+      yy+=1;
+      for(const l of sl){
+        const fs=l.pt*pt*PX;x.font=`${l.b||400} ${fs}px Sarabun, sans-serif`;x.fillStyle='#000';x.textAlign='center';x.textBaseline='middle';
+        const hh=lh(l.pt);
+        if(l.box){const tw=x.measureText(l.t).width+8*PX;x.lineWidth=.4*PX;x.strokeStyle='#000';x.strokeRect(PW/2*PX-tw/2,yy*PX,tw,(hh+1)*PX);x.fillText(l.t,PW/2*PX,(yy+(hh+1)/2)*PX);yy+=hh+3}
+        else{x.fillText(l.t,PW/2*PX,(yy+hh/2)*PX);yy+=hh}
+      }
+    }
+    out.push(c);
+  }
+  return out;
+}
+let _jspdf=null;
+function loadJsPdf(){if(_jspdf)return _jspdf;_jspdf=new Promise((res,rej)=>{const sc=document.createElement('script');sc.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';sc.onload=()=>res(window.jspdf.jsPDF);sc.onerror=()=>{_jspdf=null;rej(new Error('โหลดตัวสร้าง PDF ไม่ได้ (ต้องต่ออินเทอร์เน็ต)'))};document.head.appendChild(sc)});return _jspdf}
+const canvasBlob=(c,t='image/jpeg',q=.88)=>new Promise(r=>c.toBlob(r,t,q));
+const safeName=s=>s.replace(/[\\/:*?"<>|]+/g,'').replace(/\s+/g,'_').slice(0,60);
+async function shareFiles(files,title){
+  if(navigator.canShare&&navigator.canShare({files})){
+    try{await navigator.share({files,title});return}catch(e){if(e.name==='AbortError')return}
+  }
+  files.forEach(f=>{const a=document.createElement('a');a.href=URL.createObjectURL(f);a.download=f.name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),5000)});
+  toast('ดาวน์โหลดไฟล์แล้ว (เครื่องนี้แชร์ตรงไม่ได้)');
+}
+async function doShare(kind){
+  let files=[],title='';busy(true);
+  try{
+    const job=await buildJob();if(!job)return;
+    $('#busy').textContent='กำลังสร้างไฟล์…';
+    const pages=await renderPages(job);
+    const d=new Date(),stamp=`${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+    title='สำเนา '+job.titles.join(', ');
+    const base=safeName('สำเนา-'+(job.titles.length===1?job.titles[0]:job.titles.length+'เอกสาร'))+'-'+stamp;
+    if(kind==='pdf'){
+      const JsPDF=await loadJsPdf();const pdf=new JsPDF({unit:'mm',format:'a4',compress:true});
+      pages.forEach((c,i)=>{if(i)pdf.addPage();pdf.addImage(c.toDataURL('image/jpeg',.88),'JPEG',0,0,PW,PH,undefined,'FAST')});
+      files=[new File([pdf.output('blob')],base+'.pdf',{type:'application/pdf'})];
+    }else{
+      for(let i=0;i<pages.length;i++)files.push(new File([await canvasBlob(pages[i])],`${base}${pages.length>1?'-'+(i+1):''}.jpg`,{type:'image/jpeg'}));
+    }
+  }catch(e){alert('สร้างไฟล์ไม่สำเร็จ: '+(e.message||e));return}
+  finally{busy(false);$('#busy').textContent='กำลังประมวลผล…'}
+  if(files.length){window._lastShare=files;await shareFiles(files,title)}
 }
 window.addEventListener('afterprint',()=>{$('#printArea').innerHTML=''});
 
